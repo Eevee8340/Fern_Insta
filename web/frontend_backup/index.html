@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FERN // NEXUS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --c-bg: #030508;
+            --c-glass: rgba(16, 24, 32, 0.65);
+            --c-glass-border: rgba(100, 255, 218, 0.15);
+            --c-primary: #64ffda; /* Cyan/Teal */
+            --c-accent: #bd34fe;  /* Neon Purple */
+            --c-text: #e6f1ff;
+            --c-text-dim: #8892b0;
+            
+            --f-ui: 'Rajdhani', sans-serif;
+            --f-mono: 'Share Tech Mono', monospace;
+            
+            --shadow-win: 0 15px 35px rgba(0,0,0,0.5);
+            --blur: 12px;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: var(--c-bg);
+            color: var(--c-text);
+            font-family: var(--f-ui);
+            user-select: none; /* App-like feel */
+        }
+
+        /* --- BACKGROUND CANVAS --- */
+        #neural-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: -1;
+            opacity: 0.4;
+        }
+
+        /* --- HUD ELEMENTS --- */
+        .top-bar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 48px;
+            background: rgba(3, 5, 8, 0.8);
+            border-bottom: 1px solid var(--c-glass-border);
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            justify-content: space-between;
+            z-index: 1000;
+        }
+
+        .logo {
+            font-family: var(--f-mono);
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--c-primary);
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(100, 255, 218, 0.3);
+        }
+
+        .status-ticker {
+            font-family: var(--f-mono);
+            font-size: 12px;
+            color: var(--c-text-dim);
+            display: flex;
+            gap: 24px;
+        }
+        .stat-val { color: var(--c-text); font-weight: bold; }
+        .live-dot {
+            display: inline-block; width: 6px; height: 6px; 
+            background: var(--c-primary); border-radius: 50%;
+            box-shadow: 0 0 8px var(--c-primary);
+            animation: pulse 2s infinite;
+        }
+
+        /* --- DOCK --- */
+        .dock {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 16px;
+            padding: 12px 24px;
+            background: var(--c-glass);
+            border: 1px solid var(--c-glass-border);
+            border-radius: 16px;
+            backdrop-filter: blur(var(--blur));
+            z-index: 2000;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+
+        .dock-btn {
+            width: 48px; height: 48px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid transparent;
+            color: var(--c-text-dim);
+            font-size: 22px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+        }
+        .dock-btn:hover {
+            transform: translateY(-8px) scale(1.1);
+            background: rgba(255,255,255,0.1);
+            color: var(--c-text);
+            border-color: var(--c-primary);
+            box-shadow: 0 0 15px rgba(100, 255, 218, 0.2);
+        }
+        .dock-btn.active::after {
+            content: ''; position: absolute; bottom: -6px;
+            width: 4px; height: 4px; background: var(--c-primary);
+            border-radius: 50%;
+        }
+
+        /* --- WINDOW SYSTEM --- */
+        .window { 
+            position: absolute;
+            background: var(--c-glass);
+            border: 1px solid var(--c-glass-border);
+            border-radius: 8px;
+            backdrop-filter: blur(var(--blur));
+            box-shadow: var(--shadow-win);
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            transition: opacity 0.2s, transform 0.2s;
+            opacity: 0; pointer-events: none; transform: scale(0.95);
+        }
+        .window.visible { opacity: 1; pointer-events: auto; transform: scale(1); }
+        .window.focused { 
+            border-color: rgba(100, 255, 218, 0.4); 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            z-index: 100 !important;
+        }
+
+        .win-bar { 
+            height: 36px;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid var(--c-glass-border);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 12px;
+            cursor: grab;
+            user-select: none;
+        }
+        .win-bar:active { cursor: grabbing; }
+
+        .win-title {
+            font-family: var(--f-mono);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--c-primary);
+        }
+
+        .win-controls { display: flex; gap: 8px; }
+        .ctrl-btn {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            cursor: pointer;
+        }
+        .ctrl-close:hover { background: #ff5f56; }
+
+        .win-content {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* --- COMPONENT: TERMINAL --- */
+        .terminal {
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            padding: 12px;
+            font-family: var(--f-mono);
+            font-size: 12px;
+            overflow-y: auto;
+            color: #dcdcdc;
+        }
+        .term-line { margin-bottom: 4px; word-break: break-all; }
+        .term-time { color: #555; margin-right: 8px; }
+        .term-info { color: #64ffda; }
+        .term-warn { color: #f1fa8c; }
+        .term-err { color: #ff5555; }
+
+        /* --- COMPONENT: CHAT --- */
+        .chat-layout {
+            display: flex; flex-direction: column; height: 100%;
+        }
+        .chat-msgs {
+            flex: 1; overflow-y: auto; padding: 16px;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .chat-bubble {
+            max-width: 80%; padding: 10px 14px;
+            border-radius: 12px; font-size: 14px; line-height: 1.4;
+            position: relative;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .cb-them {
+            align-self: flex-start;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-bottom-left-radius: 2px;
+            color: #eee;
+        }
+        .cb-me {
+            align-self: flex-end;
+            background: rgba(100, 255, 218, 0.15);
+            border: 1px solid rgba(100, 255, 218, 0.3);
+            border-bottom-right-radius: 2px;
+            color: var(--c-primary);
+        }
+        .cb-meta { 
+            font-size: 10px; color: var(--c-text-dim); margin-bottom: 2px; font-family: var(--f-mono);
+        }
+        
+        .chat-input-area {
+            height: 50px;
+            border-top: 1px solid var(--c-glass-border);
+            padding: 8px;
+            display: flex;
+        }
+        .cyber-input {
+            flex: 1;
+            background: rgba(0,0,0,0.3);
+            border: none;
+            color: var(--c-text);
+            padding: 0 16px;
+            font-family: var(--f-ui);
+            border-radius: 4px;
+        }
+        .cyber-input:focus { background: rgba(0,0,0,0.5); }
+
+        /* --- COMPONENT: VISION --- */
+        .vision-container {
+            width: 100%; height: 100%;
+            background: #000;
+            display: flex; align-items: center; justify-content: center;
+            position: relative;
+        }
+        .vision-img {
+            max-width: 100%; max-height: 100%;
+            opacity: 0.9;
+        }
+        .scan-line {
+            position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: var(--c-primary);
+            box-shadow: 0 0 10px var(--c-primary);
+            animation: scan 3s linear infinite;
+            opacity: 0.5;
+        }
+
+        /* --- CONFIG FORM --- */
+        .cfg-p { padding: 20px; overflow-y: auto; height: 100%; }
+        .cfg-row { margin-bottom: 16px; }
+        .cfg-label { display: block; font-size: 11px; color: var(--c-text-dim); margin-bottom: 6px; font-family: var(--f-mono); text-transform: uppercase; }
+        .cfg-field { 
+            width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--c-glass-border); 
+            color: var(--c-text); padding: 8px; border-radius: 4px; font-family: var(--f-mono);
+        }
+        .cfg-btn {
+            width: 100%; padding: 10px; background: var(--c-primary); color: #000; font-weight: bold; border: none; cursor: pointer; border-radius: 4px; margin-top: 12px;
+        }
+
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+        @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
+        @keyframes popIn { 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
+
+        /* SCROLLBAR */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(100, 255, 218, 0.2); border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <canvas id="neural-canvas"></canvas>
+
+    <!-- TOP BAR -->
+    <div class="top-bar">
+        <div class="logo">FERN<span style="color:#fff;">//</span>NEXUS</div>
+        <div class="status-ticker">
+            <div>NET: <span id="st-net" class="stat-val">OFFLINE</span></div>
+            <div>TPS: <span id="st-tps" class="stat-val">0.0</span></div>
+            <div>MEM: <span id="st-mem" class="stat-val">0%</span></div>
+            <div class="live-dot"></div>
+        </div>
+    </div>
+
+    <!-- WINDOWS (Pre-defined) -->
+    
+    <!-- 1. CORTEX (Chat) -->
+    <div id="win-chat" class="window visible" style="width: 400px; height: 500px; top: 100px; right: 50px;">
+        <div class="win-bar" onmousedown="startDrag(event, 'win-chat')">
+            <div class="win-title">Neural Interface</div>
+            <div class="win-controls"><div class="ctrl-btn ctrl-close" onclick="toggleWin('win-chat')"></div></div>
+        </div>
+        <div class="win-content">
+            <div class="chat-layout">
+                <div class="chat-msgs" id="chat-feed">
+                    <div class="chat-bubble cb-them">
+                        <div class="cb-meta">SYSTEM</div>
+                        Fern Nexus initialized. Waiting for input...
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <input type="text" id="chat-input" class="cyber-input" placeholder="Enter command..." onkeydown="handleInput(event)">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. VISION (Live Feed) -->
+    <div id="win-vision" class="window visible" style="width: 500px; height: 350px; top: 100px; left: 50px;">
+        <div class="win-bar" onmousedown="startDrag(event, 'win-vision')">
+            <div class="win-title">Ocular Feed [Live]</div>
+            <div class="win-controls"><div class="ctrl-btn ctrl-close" onclick="toggleWin('win-vision')"></div></div>
+        </div>
+        <div class="win-content">
+            <div class="vision-container">
+                <img id="live-img" class="vision-img" src="">
+                <div class="scan-line"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. TERMINAL (Logs) -->
+    <div id="win-term" class="window visible" style="width: 600px; height: 250px; bottom: 100px; left: 50px;">
+        <div class="win-bar" onmousedown="startDrag(event, 'win-term')">
+            <div class="win-title">System Kernel</div>
+            <div class="win-controls"><div class="ctrl-btn ctrl-close" onclick="toggleWin('win-term')"></div></div>
+        </div>
+        <div class="win-content">
+            <div class="terminal" id="term-feed">
+                <!-- Logs injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. CONFIG (Hidden) -->
+    <div id="win-cfg" class="window" style="width: 400px; height: 500px; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);">
+        <div class="win-bar" onmousedown="startDrag(event, 'win-cfg')">
+            <div class="win-title">System Configuration</div>
+            <div class="win-controls"><div class="ctrl-btn ctrl-close" onclick="toggleWin('win-cfg')"></div></div>
+        </div>
+        <div class="win-content">
+            <div class="cfg-p">
+                <div class="cfg-row">
+                    <label class="cfg-label">System Personality</label>
+                    <textarea id="cfg-profile" class="cfg-field" style="height: 150px;"></textarea>
+                </div>
+                <div class="cfg-row">
+                    <label class="cfg-label">Model Path</label>
+                    <input id="cfg-model" type="text" class="cfg-field">
+                </div>
+                <div class="cfg-row">
+                    <label class="cfg-label">Creativity (Temp)</label>
+                    <input id="cfg-temp" type="number" step="0.1" class="cfg-field">
+                </div>
+                <button class="cfg-btn" onclick="saveConfig()">REBOOT SYSTEM</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DOCK -->
+    <div class="dock">
+        <div class="dock-btn active" onclick="toggleWin('win-vision')" title="Vision">👁</div>
+        <div class="dock-btn active" onclick="toggleWin('win-chat')" title="Chat">💬</div>
+        <div class="dock-btn active" onclick="toggleWin('win-term')" title="Terminal">_</div>
+        <div class="dock-btn" onclick="toggleWin('win-cfg'); loadConfig();" title="Settings">⚙</div>
+        <div style="width:1px; background:rgba(255,255,255,0.1); margin:0 4px;"></div>
+        <div class="dock-btn" onclick="api('/command', {text:'/sleep'})" title="Sleep">🌙</div>
+        <div class="dock-btn" onclick="api('/command', {text:'/wake'})" title="Wake">⚡</div>
+    </div>
+
+    <script>
+        /* --- BACKGROUND VISUALS (CANVAS) --- */
+        const canvas = document.getElementById('neural-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let particles = [];
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 0.5;
+                this.vy = (Math.random() - 0.5) * 0.5;
+                this.size = Math.random() * 2 + 1;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.x < 0 || this.x > width) this.vx *= -1;
+                if (this.y < 0 || this.y > height) this.vy *= -1;
+            }
+            draw() {
+                ctx.fillStyle = 'rgba(100, 255, 218, 0.5)';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        for (let i = 0; i < 60; i++) particles.push(new Particle());
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            
+            // Draw connections
+            ctx.strokeStyle = 'rgba(100, 255, 218, 0.15)';
+            ctx.lineWidth = 1;
+            
+            for (let i = 0; i < particles.length; i++) {
+                let p = particles[i];
+                p.update();
+                p.draw();
+                
+                for (let j = i + 1; j < particles.length; j++) {
+                    let p2 = particles[j];
+                    let dx = p.x - p2.x;
+                    let dy = p.y - p2.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist < 150) {
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        /* --- WINDOW MANAGEMENT (DRAG) --- */
+        let zIndexCounter = 100;
+        let draggedWin = null;
+        let offset = {x:0, y:0};
+
+        function toggleWin(id) {
+            const el = document.getElementById(id);
+            if(el.classList.contains('visible')) {
+                el.classList.remove('visible');
+            } else {
+                el.classList.add('visible');
+                focusWin(el);
+            }
+        }
+
+        function focusWin(el) {
+            zIndexCounter++;
+            el.style.zIndex = zIndexCounter;
+            document.querySelectorAll('.window').forEach(w => w.classList.remove('focused'));
+            el.classList.add('focused');
+        }
+
+        function startDrag(e, id) {
+            const el = document.getElementById(id);
+            draggedWin = el;
+            focusWin(el);
+            const rect = el.getBoundingClientRect();
+            offset.x = e.clientX - rect.left;
+            offset.y = e.clientY - rect.top;
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            if(!draggedWin) return;
+            draggedWin.style.left = (e.clientX - offset.x) + 'px';
+            draggedWin.style.top = (e.clientY - offset.y) + 'px';
+            // Remove transform centering if dragged
+            draggedWin.style.transform = "scale(1)"; 
+        });
+
+        window.addEventListener('mouseup', () => { draggedWin = null; });
+
+        /* --- APP LOGIC --- */
+        const API = window.location.origin;
+        const WS_URL = (location.protocol==='https:'?'wss:':'ws:') + '//' + location.host + '/ws';
+        let rawConfig = "";
+
+        // API Helper
+        async function api(path, body=null) {
+            const opts = body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : {};
+            return fetch(API+path, opts).then(r=>r.json()).catch(console.error);
+        }
+
+        // WebSocket
+        function connect() {
+            const ws = new WebSocket(WS_URL);
+            ws.onmessage = (e) => {
+                const m = JSON.parse(e.data);
+                if(m.type === 'log') log(m.text);
+                if(m.type === 'chat_message') chat(m.sender, m.text);
+                if(m.type === 'meta') stats(m);
+            };
+            ws.onclose = () => setTimeout(connect, 3000);
+        }
+        connect();
+
+        function log(txt) {
+            const box = document.getElementById('term-feed');
+            const d = document.createElement('div');
+            d.className = 'term-line';
+            
+            const time = new Date().toLocaleTimeString('en-US',{hour12:false});
+            
+            // Syntax Highlight
+            let html = `<span class="term-time">[${time}]</span>`;
+            if(txt.includes('Error')) html += `<span class="term-err">${txt}</span>`;
+            else if(txt.includes('Warning')) html += `<span class="term-warn">${txt}</span>`;
+            else if(txt.includes('>>>')) html += `<span class="term-info">${txt}</span>`;
+            else html += txt;
+            
+            d.innerHTML = html;
+            box.appendChild(d);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function chat(sender, txt) {
+            const box = document.getElementById('chat-feed');
+            const isMe = sender === 'Fern' || sender.toLowerCase().includes('you');
+            const d = document.createElement('div');
+            d.className = `chat-bubble ${isMe ? 'cb-me' : 'cb-them'}`;
+            d.innerHTML = `<div class="cb-meta">${sender.toUpperCase()}</div>${txt}`;
+            box.appendChild(d);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function stats(data) {
+            document.getElementById('st-tps').innerText = data.tps.toFixed(1);
+            document.getElementById('st-mem').innerText = data.mem_usage;
+            document.getElementById('st-net').innerText = "ONLINE";
+            document.getElementById('st-net').style.color = "#64ffda";
+        }
+
+        function handleInput(e) {
+            if(e.key === 'Enter') {
+                const val = e.target.value;
+                if(!val) return;
+                chat('You', val); // Optimistic UI
+                
+                if(val.startsWith('/')) api('/command', {text:val});
+                else api('/command', {text:`/say ${val}`});
+                
+                e.target.value = '';
+            }
+        }
+
+        // Vision Loop
+        setInterval(() => {
+            const el = document.getElementById('win-vision');
+            if(el.classList.contains('visible')) {
+                document.getElementById('live-img').src = API + '/screenshot?t=' + Date.now();
+            }
+        }, 800);
+
+        // Config
+        async function loadConfig() {
+            const d = await api('/config');
+            rawConfig = d.content;
+            const val = (re) => (rawConfig.match(re)||[])[1] || "";
+            
+            document.getElementById('cfg-profile').value = val(/PROFILE = """([\s\S]*?)"""/);
+            document.getElementById('cfg-model').value = val(/MODEL_PATH = "(.*?)"/);
+            document.getElementById('cfg-temp').value = val(/TEMPERATURE = ([0-9.]+)/);
+        }
+
+        async function saveConfig() {
+            if(!confirm("Reboot?")) return;
+            const get = (id) => document.getElementById(id).value;
+            let c = rawConfig;
+            
+            c = c.replace(/PROFILE = """[\s\S]*?"""/, `PROFILE = """
+${get('cfg-profile')}
+"""`);
+            c = c.replace(/MODEL_PATH = ".*?"/, `MODEL_PATH = "${get('cfg-model')}"`);
+            c = c.replace(/TEMPERATURE = [0-9.]+/, `TEMPERATURE = ${get('cfg-temp')}`);
+            
+            await api('/config', {content: c});
+            await api('/restart');
+            location.reload();
+        }
+
+    </script>
+</body>
+</html>

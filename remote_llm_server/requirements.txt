@@ -1,0 +1,5 @@
+llama-cpp-python[server]==0.2.90
+uvicorn
+fastapi
+sse-starlette
+pydantic-settings

@@ -1,0 +1,43 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Secrets & Private Data
+user_data/
+user_profiles/
+user_data_backup_v1/
+backups/
+*.log
+*.jsonl
+session_state.json
+state.json
+leaderboard.json
+lore.json
+aliases.json
+
+# Databases
+fern_memory_db/
+*.sqlite3
+
+# Large Model Files
+*.gguf
+*.bin
+*.pt
+*.pth
+
+# OS/IDE
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+dist/
+build/
+*.egg-info/

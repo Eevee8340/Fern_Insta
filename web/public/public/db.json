@@ -1,0 +1,30 @@
+{
+    "status": {
+        "is_alive": false,
+        "is_sleeping": false,
+        "last_updated": 0,
+        "msg_count": 0
+    },
+    "leaderboard": {
+        "weekly": {
+            "@example_user": 0
+        }
+    },
+    "lore": {
+        "example_lore": {
+            "definition": "An example lore entry for the bot.",
+            "first_seen": 0
+        }
+    },
+    "profiles": [
+        {
+            "handle": "@example_user",
+            "title": "New User",
+            "pfp_url": "https://ui-avatars.com/api/?name=User&background=random",
+            "feats": [
+                "Joined the chat"
+            ],
+            "quote": "Hello, I am a new user."
+        }
+    ]
+}

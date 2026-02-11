@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bg text-text font-sans antialiased overflow-hidden transition-colors duration-200;
+  }
+
+  /* Dark Mode Variables - Defaulting to Dark for Public Dash */
+  :root {
+    --surface: #ffffff;
+    --bg: #fafafa;
+    --text: #262626;
+    --border: #dbdbdb;
+  }
+
+  .dark body {
+    @apply bg-[#121212] text-[#f5f5f5];
+  }
+}
+
+@layer components {
+
+  /* Dynamic Surface Colors */
+  .card {
+    @apply bg-surface border border-border rounded-lg shadow-card transition-colors duration-200;
+  }
+
+  .dark .card {
+    @apply bg-[#1e1e1e] border-[#363636] shadow-none;
+  }
+
+  .dark .bg-surface {
+    @apply bg-[#1e1e1e];
+  }
+
+  .dark .bg-bg {
+    @apply bg-[#121212];
+  }
+
+  .dark .text-text {
+    @apply text-[#f5f5f5];
+  }
+
+  .dark .text-text-secondary {
+    @apply text-[#a8a8a8];
+  }
+
+  .dark .text-text-tertiary {
+    @apply text-[#737373];
+  }
+
+  .dark .border-border {
+    @apply border-[#363636];
+  }
+
+  /* Buttons */
+  .btn {
+    @apply px-4 py-2 rounded-lg font-semibold text-sm transition-colors flex items-center justify-center gap-2;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary text-white hover:bg-primary-hover;
+  }
+}
+
+/* Custom Scrollbar */
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #dbdbdb;
+    border-radius: 10px;
+  }
+
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #404040;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+  }
+
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #505050;
+  }
+
+  /* Firefox Support */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #dbdbdb transparent;
+  }
+
+  .dark .custom-scrollbar {
+    scrollbar-color: #404040 transparent;
+  }
+}
+
+/* Global Scrollbar (Fallback) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #dbdbdb;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #404040;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #505050;
+}
