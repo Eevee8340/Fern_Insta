@@ -6,7 +6,7 @@ from services.tracing import tracer
 
 # Conditional Imports
 try:
-    import google.generativeai as genai
+    from google import genai
     HAS_GEMINI = True
 except ImportError:
     HAS_GEMINI = False
@@ -36,7 +36,7 @@ class PluginLLM:
         self.temperature = self.settings.get("temperature", 0.7)
         
         self.client = None
-        self.gemini_model = None
+        self.gemini_client = None
         
         # print(f"   [+] {context_name} initializing with backend: {self.backend}")
 
@@ -52,11 +52,11 @@ class PluginLLM:
         global _CLIENT_CACHE
         
         if _CLIENT_CACHE["gemini"]:
-            self.gemini_model = _CLIENT_CACHE["gemini"]
+            self.gemini_client = _CLIENT_CACHE["gemini"]
             return
 
         if not HAS_GEMINI:
-            print(f"   [!] {self.context}: google-generativeai not installed.")
+            print(f"   [!] {self.context}: google-genai not installed.")
             return
 
         api_key = os.getenv("GEMINI_API_KEY")
@@ -65,16 +65,10 @@ class PluginLLM:
             return
             
         try:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel(
-                plugin_config.PLUGIN_GEMINI_MODEL,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=self.temperature,
-                    max_output_tokens=self.max_tokens
-                )
-            )
-            _CLIENT_CACHE["gemini"] = model
-            self.gemini_model = model
+            # Initialize the new Google GenAI Client
+            client = genai.Client(api_key=api_key)
+            _CLIENT_CACHE["gemini"] = client
+            self.gemini_client = client
             print(f"   [+] Shared Gemini Client Initialized.")
         except Exception as e:
             print(f"   [!] {self.context} Gemini Init Error: {e}")
@@ -138,17 +132,37 @@ class PluginLLM:
         return None
 
     async def _generate_gemini(self, prompt, system_instruction):
-        if not self.gemini_model:
+        if not self.gemini_client:
             return None
             
-        full_prompt = prompt
-        if system_instruction:
-                full_prompt = f"System Instruction: {system_instruction}\n\nUser Task: {prompt}"
+        try:
+            from google.genai import types
+            
+            # Prepare configuration using the new types
+            config_params = {
+                "temperature": self.temperature,
+                "max_output_tokens": self.max_tokens,
+            }
+            
+            if system_instruction:
+                config_params["system_instruction"] = system_instruction
 
-        response = await asyncio.to_thread(
-            self.gemini_model.generate_content, full_prompt
-        )
-        return response.text.strip()
+            gen_config = types.GenerateContentConfig(**config_params)
+
+            response = await asyncio.to_thread(
+                self.gemini_client.models.generate_content,
+                model=plugin_config.PLUGIN_GEMINI_MODEL,
+                contents=prompt,
+                config=gen_config
+            )
+            
+            if response and response.text:
+                return response.text.strip()
+            return None
+            
+        except Exception as e:
+            print(f"   [!] Gemini Generation Error: {e}")
+            return None
 
     async def _generate_local(self, prompt, system_instruction, **kwargs):
         if not self.client:

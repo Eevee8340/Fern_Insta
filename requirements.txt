@@ -2,7 +2,7 @@ playwright
 fastapi
 uvicorn
 python-dotenv
-google-generativeai
+google-genai
 openai
 chromadb
 sentence-transformers
